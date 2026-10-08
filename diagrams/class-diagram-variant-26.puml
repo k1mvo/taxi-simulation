@@ -1,0 +1,119 @@
+@startuml
+title Диаграмма классов. Вариант 26 (ИБ, ИЗ2, ПЗ1, Д1ОЗ3, Д1ОО4, Д2П2, Д2Б3, ОР1, ОД2). Система маршрутизации заявок такси
+skinparam classAttributeIconSize 0
+
+class Request {
+  -sourceId : int
+  -seqNumber : int
+  -arrivalTime : double
+  -bufferEntryTime : double
+  -serviceStartTime : double
+  -serviceEndTime : double
+  -refused : bool
+  +getWaitTime() : double
+  +getServiceTime() : double
+  +getSystemTime() : double
+}
+
+class Zone {
+  -id : int
+  -uniformA : double
+  -uniformB : double
+  -nextArrivalTime : double
+  -generatedCount : int
+  +generateNext(currentTime : double) : Request
+  +scheduleNext(currentTime : double) : double
+}
+
+class Driver {
+  -id : int
+  -busy : bool
+  -currentRequest : Request
+  -busyTime : double
+  -mu : double
+  +startService(request : Request, currentTime : double) : void
+  +finishService(currentTime : double) : Request
+  +isFree() : bool
+}
+
+class BufferSlot {
+  -index : int
+  -request : Request
+  -occupied : bool
+}
+
+class RequestBuffer {
+  -capacity : int
+  -slots : BufferSlot[]
+  -selectPointer : int
+  +hasFreeSlot() : bool
+  +placeOnFreeSlot(request : Request) : int
+  +evictNewest() : Request
+  +selectByRing() : Request
+  +removeAt(index : int) : void
+  +isEmpty() : bool
+}
+
+class PostDispatcher {
+  -buffer : RequestBuffer
+  -statistics : Statistics
+  +onArrival(request : Request, currentTime : double) : void
+  -handleOverflow(request : Request) : Request
+}
+
+class SelectDispatcher {
+  -buffer : RequestBuffer
+  -drivers : Driver[]
+  -driverPointer : int
+  -statistics : Statistics
+  +onArrivalTrigger(currentTime : double) : void
+  +onDriverFree(driverId : int, currentTime : double) : void
+  -selectFreeDriverRing() : Driver
+}
+
+class EventCalendar {
+  -events : Event[]
+  +addEvent(event : Event) : void
+  +nextEvent() : Event
+}
+
+class Statistics {
+  -perZone : Map<int, ZoneStats>
+  -perDriver : Map<int, DriverStats>
+  +registerArrival(request : Request) : void
+  +registerRefusal(request : Request) : void
+  +registerServiceStart(request : Request) : void
+  +registerServiceEnd(request : Request) : void
+  +buildSummaryTable() : Table
+}
+
+class SimulationModel {
+  -zones : Zone[]
+  -buffer : RequestBuffer
+  -drivers : Driver[]
+  -postDispatcher : PostDispatcher
+  -selectDispatcher : SelectDispatcher
+  -calendar : EventCalendar
+  -statistics : Statistics
+  -currentTime : double
+  +runStepMode() : void
+  +runAutoMode(requiredRequests : int) : void
+}
+
+SimulationModel "1" *-- "n" Zone
+SimulationModel "1" *-- "1" RequestBuffer
+SimulationModel "1" *-- "m" Driver
+SimulationModel "1" *-- "1" PostDispatcher
+SimulationModel "1" *-- "1" SelectDispatcher
+SimulationModel "1" *-- "1" EventCalendar
+SimulationModel "1" *-- "1" Statistics
+PostDispatcher --> RequestBuffer : uses
+PostDispatcher --> Statistics : uses
+SelectDispatcher --> RequestBuffer : uses
+SelectDispatcher --> Driver : uses
+SelectDispatcher --> Statistics : uses
+RequestBuffer "1" *-- "capacity" BufferSlot
+BufferSlot "1" o-- "0..1" Request
+Zone ..> Request : creates
+Driver --> Request : serves
+@enduml

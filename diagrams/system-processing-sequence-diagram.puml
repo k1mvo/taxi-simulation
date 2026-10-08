@@ -1,0 +1,63 @@
+@startuml
+title Сводная сиквенс-диаграмма. Вариант 26 (ИБ, ИЗ2, ПЗ1, Д1ОЗ3, Д1ОО4, Д2П2, Д2Б3, ОР1, ОД2)
+participant "Зона Зi" as Z
+participant "Диспетчер постановки" as DP
+participant "Буфер" as B
+participant "Диспетчер выбора" as DV
+participant "Водитель Вj" as V
+participant "Статистика" as S
+
+== HappyFlow: буфер пуст, водитель свободен ==
+Z -> DP : Заявка(i, seq, t)\nинтервал ~ Uniform(a,b), ИЗ2
+DP -> B : hasFreeSlot()
+B --> DP : да, буфер пуст
+DP -> B : placeOnFreeSlot(заявка)
+note right of B : Д1ОЗ3 — первое свободное место,\nбез сдвига очереди
+DP -> S : registerArrival(заявка)
+DP -> DV : triggerCheck() [триггер: новая заявка]
+DV -> B : isEmpty()
+B --> DV : нет
+DV -> B : selectByRing() [Д2Б3, указатель Уб]
+B --> DV : заявка, слот освобождён
+DV -> DV : selectFreeDriverRing() [Д2П2, указатель Уп]
+DV -> V : startService(заявка, t)
+note right of V : время поездки ~ Exp(μ), ПЗ1
+DV -> S : registerServiceStart(заявка)
+
+== Занятость водителей: постановка в буфер или отказ ==
+Z -> DP : Заявка(i, seq, t)
+DP -> B : hasFreeSlot()
+alt есть свободное место (Д1ОЗ3)
+  B --> DP : да, слот k
+  DP -> B : placeOnFreeSlot(заявка)
+  B --> DP : OK
+else буфер заполнен — переполнение
+  B --> DP : свободных мест нет
+  DP -> B : evictNewest() [Д1ОО4]
+  note right of B : выбивается заявка, позже всех\nвставшая в буфер
+  B --> DP : выбитая заявка (i', seq')
+  DP -> S : registerRefusal(i', seq')
+  DP -> B : placeOnFreeSlot(новая заявка)
+  B --> DP : OK
+end
+DP -> S : registerArrival(заявка)
+DP -> DV : triggerCheck()
+DV -> DV : hasFreeDriver() = нет
+loop ожидание триггерного события
+  note over DV, V : ждём onDriverFree() от водителя
+end
+
+== Освобождение водителя ==
+V -> V : поездка завершена (t_end)
+V -> S : registerServiceEnd(заявка)
+V -> DV : onDriverFree(j, t_end)
+alt буфер не пуст
+  DV -> B : selectByRing() [Д2Б3, от Уб]
+  B --> DV : следующая заявка
+  DV -> DV : selectFreeDriverRing() [Д2П2, от Уп]
+  DV -> V : startService(заявка, t_end)
+  DV -> S : registerServiceStart(заявка)
+else буфер пуст
+  DV --> V : водитель остаётся свободным
+end
+@enduml
